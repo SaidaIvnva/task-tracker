@@ -1,0 +1,6 @@
+{
+  "tasks": [
+    { "id": "1", "text": "Изучить fetch", "completed": false },
+    { "id": "2", "text": "Сделать трекер", "completed": false }
+  ]
+}
