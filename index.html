@@ -1,30 +1,30 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="ru">
 <head>
-    <meta charset="UTF-8"/>
-    <link rel="icon" type="image/svg+xml" href="/vite.svg"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Data Table App</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Таск трекер</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main id="app" class="container">
-    <!-- Table content will be inserted here -->
-</main>
+  <main>
+    <h1>Трекер задач</h1>
+    <form class="form">
+      <label for="text" class="visually-hidden">Описание задачи</label>
+      <input type="text" placeholder="Что нужно сделать?" id="text" />
 
-<!-- Search bar template -->
-<template id="search">
-    <div class="search-bar">
-        <label class="search-wrapper" data-name="searchField">
-            <i class="icon search-icon" aria-hidden="true"></i>
-            <input type="text" name="search" class="input" placeholder="Search" data-name="search">
-        </label>
-        <button type="reset" class="button reset-wrapper" data-name="reset">
-            Reset all filters
-            <i class="icon reset-icon" aria-hidden="true"></i>
-        </button>
+      <button type="submit">Отправить</button>
+    </form>
+
+    <p class="error" hidden></p>
+
+    <div class="tasks-header">
+      <span>Задачи</span>
+      <span class="tasks-counter"></span>
     </div>
-</template>
 
-<script type="module" src="/src/main.js"></script>
+    <ul class="tasks"></ul>
+  </main>
+  <script src="app.js"></script>
 </body>
 </html>
