@@ -9,21 +9,113 @@
 <body>
   <main>
     <h1>Трекер задач</h1>
-    <form class="form">
-      <label for="text" class="visually-hidden">Описание задачи</label>
-      <input type="text" placeholder="Что нужно сделать?" id="text" />
 
-      <button type="submit">Отправить</button>
-    </form>
-
-    <p class="error" hidden></p>
-
-    <div class="tasks-header">
-      <span>Задачи</span>
-      <span class="tasks-counter"></span>
+    <div class="modes" role="group" aria-label="Режим просмотра">
+      <button class="mode" type="button" data-mode="day">По дням</button>
+      <button class="mode" type="button" data-mode="week">По неделям</button>
     </div>
 
-    <ul class="tasks"></ul>
+    <div class="layout">
+      <aside class="side">
+      <div class="days">
+        <button class="days-step" type="button" data-step="-1" aria-label="Предыдущий день">&#9650;</button>
+
+        <div class="days-strip" role="group" aria-label="Выбор дня"></div>
+
+        <button class="days-step" type="button" data-step="1" aria-label="Следующий день">&#9660;</button>
+
+        <button class="days-today" type="button" hidden>Сегодня</button>
+      </div>
+
+      <div class="projects">
+        <div class="projects-header">
+          <span>Проекты</span>
+          <button class="project-add" type="button" aria-label="Создать проект" title="Создать проект">+</button>
+        </div>
+        <div class="projects-scroll">
+          <button class="projects-arrow projects-arrow-start" type="button" hidden aria-label="Прокрутить назад"></button>
+          <ul class="projects-list"></ul>
+          <button class="projects-arrow projects-arrow-end" type="button" hidden aria-label="Прокрутить вперёд"></button>
+        </div>
+      </div>
+      </aside>
+
+      <div class="content">
+        <form class="form">
+          <label for="text" class="visually-hidden">Описание задачи</label>
+          <input type="text" placeholder="Что нужно сделать?" id="text" />
+
+          <label class="field">
+            <span class="field-label">В работу</span>
+            <input type="date" id="planned" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Дедлайн</span>
+            <input type="date" id="deadline" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Проект</span>
+            <select id="project"></select>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Повтор</span>
+            <select id="repeat">
+              <option value="">Не повторять</option>
+              <option value="daily">Каждый день</option>
+              <option value="weekly">Каждую неделю</option>
+              <option value="monthly">Каждый месяц</option>
+              <option value="weekdays">По будням</option>
+              <option value="weekends">В выходные</option>
+              <option value="custom">Свой выбор</option>
+            </select>
+          </label>
+
+          <button type="submit">Добавить</button>
+
+          <fieldset class="weekdays" id="repeat-days" hidden></fieldset>
+        </form>
+
+        <p class="error" hidden></p>
+
+        <div class="day-view">
+          <div class="tasks-header">
+            <span class="tasks-title"></span>
+            <span class="tasks-counter"></span>
+          </div>
+
+          <ul class="tasks"></ul>
+
+          <details class="done-section" hidden>
+            <summary>
+              Уже сделанные
+              <span class="done-counter"></span>
+            </summary>
+            <ul class="tasks tasks-done"></ul>
+          </details>
+        </div>
+
+        <div class="week-view" hidden>
+          <div class="week-nav">
+            <button class="week-step" type="button" data-step="-7" aria-label="Предыдущая неделя">&#9664;</button>
+
+            <div class="weeks-strip" role="group" aria-label="Выбор недели"></div>
+
+            <button class="week-step" type="button" data-step="7" aria-label="Следующая неделя">&#9654;</button>
+
+            <button class="weeks-today" type="button" hidden>Текущая неделя</button>
+          </div>
+
+          <div class="week"></div>
+        </div>
+      </div>
+    </div>
+
+    <input type="date" class="days-picker" aria-label="Перейти к дате" />
+
+    <dialog class="editor" aria-label="Редактирование задачи"></dialog>
   </main>
   <script src="app.js"></script>
 </body>
