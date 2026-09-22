@@ -1,4 +1,7 @@
 :root {
+  /* нативные контролы (дата, чекбокс, скроллбар) следуют теме системы */
+  color-scheme: light dark;
+
   --page-bg: #f5f4f0;
   --card-bg: #ffffff;
   --text: #1a1a18;
@@ -8,7 +11,19 @@
   --border-strong: #c9c7bf;
   --accent: #378add;
   --danger: #c0392b;
+  --overdue: #d93025;
+  --today: #e8710a;
+  --soon: #f0b429;
+  --later: #1e8e3e;
   --radius: 8px;
+
+  --p-blue-bg: #e6f1fb;   --p-blue-ink: #185fa5;
+  --p-green-bg: #eaf3de;  --p-green-ink: #3b6d11;
+  --p-amber-bg: #faeeda;  --p-amber-ink: #854f0b;
+  --p-coral-bg: #faece7;  --p-coral-ink: #993c1d;
+  --p-red-bg: #fcebeb;    --p-red-ink: #a32d2d;
+  --p-purple-bg: #eeedfe; --p-purple-ink: #534ab7;
+  --p-gray-bg: #f1efe8;   --p-gray-ink: #5f5e5a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,6 +37,18 @@
     --border-strong: #4d4c43;
     --accent: #85b7eb;
     --danger: #e68a80;
+    --overdue: #f28b82;
+    --today: #fbbc4c;
+    --soon: #fdd663;
+    --later: #81c995;
+
+    --p-blue-bg: #0c447c;   --p-blue-ink: #b5d4f4;
+    --p-green-bg: #27500a;  --p-green-ink: #c0dd97;
+    --p-amber-bg: #633806;  --p-amber-ink: #fac775;
+    --p-coral-bg: #712b13;  --p-coral-ink: #f5c4b3;
+    --p-red-bg: #791f1f;    --p-red-ink: #f7c1c1;
+    --p-purple-bg: #3c3489; --p-purple-ink: #cecbf6;
+    --p-gray-bg: #444441;   --p-gray-ink: #d3d1c7;
   }
 }
 
@@ -40,7 +67,8 @@ body {
 }
 
 main {
-  max-width: 460px;
+  position: relative;
+  max-width: 720px;
   margin: 0 auto;
   padding: 1.5rem 1.75rem;
   background: var(--card-bg);
@@ -54,16 +82,613 @@ h1 {
   font-weight: 500;
 }
 
+/* Переключатель режимов */
+
+.modes {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 1.25rem;
+}
+
+.mode {
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.mode:hover {
+  background: var(--page-bg);
+}
+
+.mode-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Недельный вид */
+
+.week-nav {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 10px;
+}
+
+.week-step {
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+}
+
+.week-step:hover {
+  color: var(--text);
+  background: var(--page-bg);
+}
+
+/* Полоса недель — горизонтальный аналог полосы дней */
+
+.weeks-strip {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.week-item {
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+
+/* Соседние недели: размыты и едва различимы, но кликабельны */
+.week-item-near {
+  opacity: 0.4;
+  filter: blur(2px);
+  transform: scale(0.85);
+}
+
+.week-item-near:hover,
+.week-item-near:focus-visible {
+  opacity: 0.85;
+  filter: blur(0);
+}
+
+.week-item-current {
+  background: var(--page-bg);
+  border-color: var(--border);
+}
+
+/* Текущая неделя открывает календарь — подсказываем наведением */
+.week-item-current:hover {
+  border-color: var(--accent);
+}
+
+.week-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Неделя, в которой сегодня, подсвечена даже когда открыта другая */
+.week-item-today {
+  color: var(--accent);
+}
+
+.weeks-today {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.weeks-today:hover {
+  color: var(--text);
+  background: var(--page-bg);
+}
+
+/* Семь дней в ряд с горизонтальной прокруткой */
+.week {
+  display: grid;
+  grid-auto-columns: 160px;
+  grid-auto-flow: column;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.week-day {
+  min-width: 0;
+  padding: 8px;
+  background: var(--page-bg);
+  border-radius: 12px;
+}
+
+.week-day-today {
+  outline: 1px solid var(--accent);
+}
+
+.week-day-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0 0 6px;
+  padding-bottom: 6px;
+  font-weight: 400;
+  border-bottom: 1px solid var(--border);
+}
+
+.week-day-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.week-day-number {
+  font-size: 16px;
+  color: var(--text);
+}
+
+/* В узкой колонке карточка складывается в три строки:
+   галочка и крестик сверху, название, метки снизу */
+.week-tasks .task {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.week-tasks .task-handle {
+  order: 0;
+}
+
+.week-tasks .task-check {
+  order: 1;
+}
+
+.week-tasks .task-delete {
+  order: 2;
+  margin-left: auto;
+}
+
+.week-tasks .task-text {
+  order: 3;
+  flex: 1 1 100%;
+  font-size: 13px;
+}
+
+.week-tasks .repeat-mark,
+.week-tasks .project-tag,
+.week-tasks .deadline-dot {
+  order: 4;
+}
+
+.week-tasks .project-tag {
+  max-width: 100%;
+}
+
+.week-tasks .tasks-empty {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+/* В недельном виде полоса дней не нужна, а проекты уходят наверх */
+
+[data-mode="week"] .layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-mode="week"] .days {
+  display: none;
+}
+
+[data-mode="week"] .side {
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+}
+
+[data-mode="week"] .projects {
+  flex: 1;
+  min-width: 0;
+}
+
+[data-mode="week"] .projects-header {
+  padding-bottom: 4px;
+}
+
+[data-mode="week"] .projects-list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  max-height: none;
+  padding-top: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  --fade: to right;
+}
+
+[data-mode="week"] .projects-arrow-start,
+[data-mode="week"] .projects-arrow-end {
+  top: 50%;
+  bottom: auto;
+  padding: 8px 3px;
+  transform: translateY(-50%);
+}
+
+[data-mode="week"] .projects-arrow-start {
+  left: -1px;
+}
+
+[data-mode="week"] .projects-arrow-end {
+  right: -1px;
+  left: auto;
+}
+
+[data-mode="week"] .project-name {
+  flex: none;
+}
+
+/* Раскладка: слева дни, справа задачи выбранного дня */
+
+.layout {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Проекты */
+
+.projects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.project-add {
+  padding: 0 6px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+}
+
+.project-add:hover {
+  color: var(--text);
+  background: var(--page-bg);
+}
+
+.projects-scroll {
+  position: relative;
+}
+
+.projects-list {
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+
+  /* высота примерно на шесть проектов, дальше прокрутка */
+  max-height: 170px;
+
+  /* направление затухания меняется вместе с режимом */
+  --fade: to bottom;
+
+  /* полосу прокрутки прячем: о ней говорят затухание и стрелки */
+  scrollbar-width: none;
+}
+
+.projects-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* Подтушёвываем только тот край, за которым ещё есть содержимое */
+.projects-list.fade-start:not(.fade-end) {
+  mask-image: linear-gradient(var(--fade), transparent 0, #000 20px);
+}
+
+.projects-list.fade-end:not(.fade-start) {
+  mask-image: linear-gradient(var(--fade), #000 calc(100% - 20px), transparent 100%);
+}
+
+.projects-list.fade-start.fade-end {
+  mask-image: linear-gradient(var(--fade), transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+}
+
+.projects-arrow {
+  position: absolute;
+  z-index: 1;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.projects-arrow:hover {
+  color: var(--text);
+}
+
+/* В дневном режиме стрелки сверху и снизу */
+.projects-arrow-start {
+  top: -1px;
+  left: 50%;
+  padding: 1px 10px;
+  transform: translateX(-50%);
+}
+
+.projects-arrow-end {
+  bottom: -1px;
+  left: 50%;
+  padding: 1px 10px;
+  transform: translateX(-50%);
+}
+
+.project {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 6px;
+  overflow: hidden;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+}
+
+.project-name:hover {
+  background: var(--page-bg);
+}
+
+.project-active .project-name {
+  color: var(--accent);
+  background: var(--page-bg);
+}
+
+.project-delete {
+  flex: none;
+  padding: 2px 5px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  opacity: 0;
+}
+
+/* Крестик прячем до наведения, но он всегда доступен с клавиатуры */
+.project:hover .project-delete,
+.project-delete:focus-visible {
+  opacity: 1;
+}
+
+.project-delete:hover {
+  color: var(--danger);
+}
+
+.project-new {
+  width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.days {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Поле календаря невидимо, но остаётся в потоке: showPicker()
+   не работает на display: none. Координаты ему проставляет JS
+   по нажатому элементу, поэтому оно живёт в main, а не внутри дней —
+   в недельном режиме блок дней скрыт, и календарь уезжал в угол. */
+.days-picker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.days-step {
+  width: 100%;
+  padding: 2px 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+}
+
+.days-step:hover {
+  color: var(--text);
+  background: var(--page-bg);
+}
+
+.days-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 2px;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 6px 0;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+
+/* Соседние дни: размыты и едва различимы, но кликабельны */
+.day-near {
+  opacity: 0.4;
+  filter: blur(2px);
+  transform: scale(0.75);
+}
+
+.day-near .day-month {
+  display: none;
+}
+
+.day-near:hover,
+.day-near:focus-visible {
+  opacity: 0.85;
+  filter: blur(0);
+}
+
+.day-current {
+  background: var(--page-bg);
+  border-color: var(--border);
+}
+
+/* Текущий день открывает календарь — подсказываем это наведением */
+.day-current:hover {
+  border-color: var(--accent);
+}
+
+.day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.day-weekday,
+.day-month {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.day-number {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+/* Сегодняшнее число подсвечено, даже если открыт другой день */
+.day-today .day-number {
+  color: var(--accent);
+}
+
+.days-today {
+  width: 100%;
+  margin-top: 6px;
+  padding: 3px 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.days-today:hover {
+  color: var(--text);
+  background: var(--page-bg);
+}
+
 /* Форма добавления */
 
 .form {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  align-items: flex-end;
   margin: 0 0 1.25rem;
 }
 
+/* Поле с подписью: две даты рядом иначе не различить */
+.field {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.form input[type="date"] {
+  flex: none;
+  width: auto;
+  color: var(--text-secondary);
+}
+
+.form input[type="text"] {
+  flex-basis: 100%;
+}
+
 .form input {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 0;
   height: 36px;
   padding: 0 12px;
@@ -169,7 +794,7 @@ h1 {
   border-bottom: none;
 }
 
-.task input[type="checkbox"] {
+.task-check {
   flex: none;
   width: 16px;
   height: 16px;
@@ -178,11 +803,108 @@ h1 {
   accent-color: var(--accent);
 }
 
+/* Ручка перетаскивания */
+
+.task-handle {
+  flex: none;
+  margin-right: -4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--border-strong);
+  letter-spacing: -2px;
+  cursor: grab;
+  user-select: none;
+}
+
+.task-handle:active {
+  cursor: grabbing;
+}
+
+.task:hover .task-handle {
+  color: var(--text-muted);
+}
+
+.task.dragging {
+  opacity: 0.4;
+}
+
+/* В выполненных перетаскивание не нужно: их порядок задаётся сам */
+.tasks-done .task-handle {
+  display: none;
+}
+
+/* Текст задачи — кнопка, открывающая правку */
 .task-text {
   flex: 1;
   min-width: 0;
+  padding: 0;
+  font: inherit;
   font-size: 15px;
-  overflow-wrap: anywhere;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  overflow-wrap: break-word;
+}
+
+.task-text:hover {
+  text-decoration: underline;
+}
+
+.deadline-dot {
+  position: relative;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--border-strong);
+  border-radius: 50%;
+}
+
+/* Подсказка со сроком. Появляется сразу, в отличие от нативного title.
+   Ширина подобрана так, чтобы помещаться в колонку недели. */
+.deadline-dot[data-hint]::after {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 2;
+  display: none;
+  width: max-content;
+  max-width: 130px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--card-bg);
+  text-align: center;
+  content: attr(data-hint);
+  background: var(--text);
+  border-radius: var(--radius);
+  transform: translateX(-50%);
+}
+
+.deadline-dot[data-hint]:hover::after {
+  display: block;
+}
+
+.deadline-dot.overdue {
+  background: var(--overdue);
+}
+
+.deadline-dot.today {
+  background: var(--today);
+}
+
+.deadline-dot.soon {
+  background: var(--soon);
+}
+
+.deadline-dot.later {
+  background: var(--later);
+}
+
+/* У выполненной задачи срок уже не горит */
+.task.done .deadline-dot {
+  background: var(--border-strong);
 }
 
 .task.done .task-text {
@@ -209,6 +931,358 @@ h1 {
 .task-delete:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 0;
+}
+
+/* Шильдик проекта в строке задачи */
+
+.project-tag {
+  flex: none;
+  max-width: 120px;
+  padding: 2px 8px;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--tag-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--tag-bg);
+  border-radius: 999px;
+}
+
+.task.done .project-tag {
+  opacity: 0.6;
+}
+
+/* Цвет проекта: заливка и текст берутся из одной пары переменных */
+[data-color="blue"]   { --tag-bg: var(--p-blue-bg);   --tag-ink: var(--p-blue-ink); }
+[data-color="green"]  { --tag-bg: var(--p-green-bg);  --tag-ink: var(--p-green-ink); }
+[data-color="amber"]  { --tag-bg: var(--p-amber-bg);  --tag-ink: var(--p-amber-ink); }
+[data-color="coral"]  { --tag-bg: var(--p-coral-bg);  --tag-ink: var(--p-coral-ink); }
+[data-color="red"]    { --tag-bg: var(--p-red-bg);    --tag-ink: var(--p-red-ink); }
+[data-color="purple"] { --tag-bg: var(--p-purple-bg); --tag-ink: var(--p-purple-ink); }
+[data-color="gray"]   { --tag-bg: var(--p-gray-bg);   --tag-ink: var(--p-gray-ink); }
+
+/* Точка цвета в списке проектов */
+.project-color {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: baseline;
+  background: var(--tag-ink);
+  border-radius: 50%;
+}
+
+/* Палитра при создании проекта */
+.project-draft {
+  display: block;
+}
+
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  cursor: pointer;
+  background: var(--tag-ink);
+  border: 2px solid transparent;
+  border-radius: 50%;
+}
+
+.swatch-chosen {
+  border-color: var(--text);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Селекты выглядят как остальные поля */
+
+.field select,
+.task-edit-project {
+  height: 36px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+/* Дни недели для своего расписания */
+
+.weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* display в авторском стиле перебивает атрибут hidden — возвращаем его силу */
+.weekdays[hidden] {
+  display: none;
+}
+
+.weekday {
+  cursor: pointer;
+}
+
+/* Сам чекбокс не виден, но остаётся доступен с клавиатуры */
+.weekday input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.weekday span {
+  display: inline-block;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.weekday span:hover {
+  background: var(--page-bg);
+}
+
+.weekday input:checked + span {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.weekday input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Значок повтора в строке задачи */
+
+.repeat-mark {
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.task.done .repeat-mark {
+  opacity: 0.5;
+}
+
+/* Окно редактирования задачи */
+
+.editor {
+  width: min(440px, calc(100vw - 32px));
+  padding: 1.25rem;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.editor::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+.editor-title {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.task-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.task-edit-text {
+  flex: 1 1 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.task-edit-text:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(55, 138, 221, 0.2);
+}
+
+.task-edit-dates {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Два нативных поля даты не влезают в узкую колонку — тогда встают друг под друга */
+.task-edit-dates .field {
+  flex: 1 1 140px;
+}
+
+.task-edit-dates input {
+  width: 100%;
+}
+
+.task-edit-dates input {
+  height: 36px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.task-edit-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.task-edit-actions button {
+  height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.task-edit-actions button:hover {
+  background: var(--page-bg);
+}
+
+.task-edit-cancel {
+  color: var(--text-secondary);
+}
+
+/* Секция «Уже сделанные» */
+
+.done-section {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.done-section summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 0 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+/* display: flex убирает нативный треугольник, рисуем свой */
+.done-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.done-section summary::before {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--text-muted);
+  content: '\25b6';
+  transition: transform 0.15s ease;
+}
+
+.done-section[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.done-section summary:hover {
+  color: var(--text);
+}
+
+.done-section summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.done-counter {
+  padding: 1px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--page-bg);
+  border-radius: 999px;
+}
+
+.tasks-done {
+  padding-bottom: 4px;
+}
+
+/* Узкие экраны: поле ввода занимает всю ширину, дата и кнопка — вторую строку */
+
+@media (max-width: 560px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  /* Дни и проекты встают в одну строку над списком задач */
+  .side {
+    flex-direction: row;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .days {
+    flex: none;
+    width: 62px;
+  }
+
+  .projects {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+
+  main {
+    padding: 1.25rem 1rem;
+  }
+
+  .day-number {
+    font-size: 19px;
+  }
+
+  .form input[type="text"] {
+    flex-basis: 100%;
+  }
 }
 
 /* Доступность */
