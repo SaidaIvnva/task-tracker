@@ -1097,8 +1097,53 @@ h1 {
   border-radius: 12px;
 }
 
-.editor::backdrop {
+.editor::backdrop,
+.ask::backdrop {
   background: rgb(0 0 0 / 35%);
+}
+
+/* Окно с вопросом «к одному дню или ко всем» */
+
+.ask {
+  width: min(380px, calc(100vw - 32px));
+  padding: 1.25rem;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.ask-text {
+  margin: 0 0 1rem;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ask-actions button {
+  height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.ask-actions button:hover {
+  background: var(--page-bg);
+}
+
+.ask-danger {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .editor-title {

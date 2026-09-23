@@ -30,6 +30,7 @@ const weekGrid = document.querySelector('.week');
 const weeksStrip = document.querySelector('.weeks-strip');
 const weeksTodayButton = document.querySelector('.weeks-today');
 const editor = document.querySelector('.editor');
+const asker = document.querySelector('.ask');
 const errorBox = document.querySelector('.error');
 
 // Ключи хранилища объявлены здесь, выше первого использования:
@@ -180,6 +181,7 @@ async function addTask(text, deadline, date, projectId, repeat) {
       text,
       completed: false,
       completedDates: [],
+      skipDates: [],
       deadline,
       date,
       projectId,
@@ -290,6 +292,49 @@ async function editTask(id, fields) {
 
   tasks = tasks.map((task) => (String(task.id) === id ? updated : task));
   render();
+}
+
+// Убрать одно повторение: исходная задача просто перестаёт появляться в этот день
+async function skipOccurrence(task, iso) {
+  const updated = await request(`${API_URL}/${task.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skipDates: [...(task.skipDates ?? []), iso] }),
+  });
+
+  tasks = tasks.map((item) => (item.id === task.id ? updated : item));
+  render();
+}
+
+// Правка одного повторения: исходное правило пропускает этот день,
+// а вместо него заводится отдельная разовая задача с изменениями
+async function detachOccurrence(task, iso, fields) {
+  await request(`${API_URL}/${task.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skipDates: [...(task.skipDates ?? []), iso] }),
+  });
+
+  // В форме поле «В работу» показывает начало правила, а не открытый день.
+  // Если его не меняли, отцепленная задача должна встать именно в тот день,
+  // который редактировали, иначе она уедет к началу повтора.
+  const date = fields.date === plannedDate(task) ? iso : fields.date;
+
+  await request(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...fields,
+      date,
+      completed: isCompletedOn(task, iso),
+      completedDates: [],
+      skipDates: [],
+      repeat: null,
+      order: task.order ?? 0,
+    }),
+  });
+
+  await loadTasks();
 }
 
 async function deleteTask(id) {
@@ -517,14 +562,16 @@ function createEditForm(task) {
   return form;
 }
 
-function openEditor(id) {
+function openEditor(id, iso) {
   const task = tasks.find((item) => String(item.id) === id);
 
   if (!task) {
     return;
   }
 
-  editor.replaceChildren(createEditForm(task));
+  const form = createEditForm(task);
+  form.dataset.date = iso;
+  editor.replaceChildren(form);
   editor.showModal();
 
   const field = editor.querySelector('.task-edit-text');
@@ -729,6 +776,48 @@ function setMode(mode) {
   updateProjectsScroll();
 }
 
+/* Вопрос с несколькими вариантами */
+
+// Возвращает value выбранной кнопки либо null, если окно закрыли
+function ask(message, options) {
+  return new Promise((resolve) => {
+    const text = document.createElement('p');
+    text.className = 'ask-text';
+    text.textContent = message;
+
+    const actions = document.createElement('div');
+    actions.className = 'ask-actions';
+
+    let answer = null;
+
+    actions.append(...options.map((option) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = option.kind === 'danger' ? 'ask-danger' : '';
+      button.textContent = option.label;
+
+      button.addEventListener('click', () => {
+        answer = option.value;
+        asker.close();
+      });
+
+      return button;
+    }));
+
+    asker.replaceChildren(text, actions);
+
+    // close срабатывает и на Escape, и на клик по кнопке
+    asker.addEventListener('close', () => resolve(answer), { once: true });
+    asker.showModal();
+  });
+}
+
+asker.addEventListener('click', (event) => {
+  if (event.target === asker) {
+    asker.close();
+  }
+});
+
 /* Повторы */
 
 const REPEAT_LABELS = {
@@ -770,6 +859,11 @@ function repeatsOn(task, iso) {
     return false;
   }
 
+  // Дни, из которых повторение удалили или отцепили правкой
+  if ((task.skipDates ?? []).includes(iso)) {
+    return false;
+  }
+
   const day = parseDate(iso).getDay();
 
   switch (task.repeat.type) {
@@ -800,15 +894,24 @@ function isCompletedOn(task, iso) {
   return task.repeat ? (task.completedDates ?? []).includes(iso) : Boolean(task.completed);
 }
 
-function repeatTitle(task) {
+// Только описание расписания, без слова «повторяется»: оно подставляется
+// в тексте снаружи, и раньше для «своего выбора» выходило дважды
+function repeatSummary(task) {
   const rule = task.repeat;
 
   if (rule.type !== 'custom') {
-    return REPEAT_LABELS[rule.type] ?? 'Повторяется';
+    return (REPEAT_LABELS[rule.type] ?? 'по расписанию').toLowerCase();
   }
 
-  const names = WEEKDAYS.filter((day) => (rule.days ?? []).includes(day.value)).map((day) => day.short);
-  return names.length === 0 ? 'Повторяется' : `Повторяется: ${names.join(', ')}`;
+  const names = WEEKDAYS
+    .filter((day) => (rule.days ?? []).includes(day.value))
+    .map((day) => day.short.toLowerCase());
+
+  return names.length === 0 ? 'по расписанию' : names.join(', ');
+}
+
+function repeatTitle(task) {
+  return `Повторяется: ${repeatSummary(task)}`;
 }
 
 // Чипсы с днями недели для формы создания и для формы правки
@@ -1273,17 +1376,32 @@ main.addEventListener('click', async (event) => {
     return;
   }
 
-  const id = button.closest('.task').dataset.id;
+  const row = button.closest('.task');
+  const id = row.dataset.id;
   const task = tasks.find((item) => String(item.id) === id);
 
-  // Повторяющаяся задача исчезнет сразу из всех дней — спрашиваем
-  if (task?.repeat && !confirm(`«${task.text}» повторяется (${repeatTitle(task).toLowerCase()}). Удалить её из всех дней?`)) {
-    return;
+  let scope = 'all';
+
+  if (task?.repeat) {
+    scope = await ask(`«${task.text}» повторяется: ${repeatSummary(task)}. Что удалить?`, [
+      { value: 'one', label: 'Только этот день' },
+      { value: 'all', label: 'Все повторения', kind: 'danger' },
+      { value: null, label: 'Отмена' },
+    ]);
+
+    if (scope === null) {
+      return;
+    }
   }
 
   try {
     hideError();
-    await deleteTask(id);
+
+    if (scope === 'one') {
+      await skipOccurrence(task, row.dataset.date);
+    } else {
+      await deleteTask(id);
+    }
   } catch (error) {
     showError(error);
   }
@@ -1294,7 +1412,8 @@ main.addEventListener('click', async (event) => {
 main.addEventListener('click', (event) => {
   const opener = event.target.closest('.task-text');
   if (opener) {
-    openEditor(opener.closest('.task').dataset.id);
+    const row = opener.closest('.task');
+    openEditor(row.dataset.id, row.dataset.date);
     return;
   }
 
@@ -1326,16 +1445,40 @@ main.addEventListener('submit', async (event) => {
   }
 
   const id = form.dataset.id;
+  const task = tasks.find((item) => String(item.id) === id);
+
+  const fields = {
+    text,
+    date: form.querySelector('.task-edit-planned').value || todayISO(),
+    deadline: form.querySelector('.task-edit-deadline').value || null,
+    projectId: form.querySelector('.task-edit-project').value || null,
+    repeat: readRepeat(form.querySelector('.task-edit-repeat'), form.querySelector('.task-edit-days')),
+  };
+
+  let scope = 'all';
+
+  // Спрашиваем только у той задачи, которая повторялась до правки:
+  // если правило сняли, менять нечего, кроме неё самой
+  if (task?.repeat) {
+    scope = await ask(`«${task.text}» повторяется: ${repeatSummary(task)}. К чему применить изменения?`, [
+      { value: 'one', label: 'Только этот день' },
+      { value: 'all', label: 'Ко всем повторениям' },
+      { value: null, label: 'Отмена' },
+    ]);
+
+    if (scope === null) {
+      return;
+    }
+  }
 
   try {
     hideError();
-    await editTask(id, {
-      text,
-      date: form.querySelector('.task-edit-planned').value || todayISO(),
-      deadline: form.querySelector('.task-edit-deadline').value || null,
-      projectId: form.querySelector('.task-edit-project').value || null,
-      repeat: readRepeat(form.querySelector('.task-edit-repeat'), form.querySelector('.task-edit-days')),
-    });
+
+    if (scope === 'one') {
+      await detachOccurrence(task, form.dataset.date, fields);
+    } else {
+      await editTask(id, fields);
+    }
 
     closeEditor();
   } catch (error) {
@@ -1495,20 +1638,33 @@ main.addEventListener('dragstart', (event) => {
   event.dataTransfer.effectAllowed = 'move';
 });
 
+// Пока идёт перетаскивание, сброс принимаем где угодно. Иначе браузер
+// считает его несостоявшимся и проигрывает анимацию возврата: строка
+// прыгает на старое место и только потом встаёт на новое.
+function acceptDrag(event) {
+  if (draggingList === null) {
+    return false;
+  }
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  return true;
+}
+
+main.addEventListener('dragenter', acceptDrag);
+
 main.addEventListener('dragover', (event) => {
-  if (draggingList === null || event.target.closest('.tasks') !== draggingList) {
+  if (!acceptDrag(event)) {
     return;
   }
 
   const dragged = draggingList.querySelector('.dragging');
 
-  if (dragged === null) {
+  // Двигаем строку, только когда курсор над своим списком: между
+  // колонками недели не переносим
+  if (dragged === null || event.target.closest('.tasks') !== draggingList) {
     return;
   }
-
-  // Без preventDefault браузер считает, что бросать сюда нельзя
-  event.preventDefault();
-  event.dataTransfer.dropEffect = 'move';
 
   const target = dropTargetAt(draggingList, event.clientY);
 
@@ -1519,7 +1675,11 @@ main.addEventListener('dragover', (event) => {
   }
 });
 
-main.addEventListener('drop', (event) => event.preventDefault());
+main.addEventListener('drop', (event) => {
+  if (draggingList !== null) {
+    event.preventDefault();
+  }
+});
 
 main.addEventListener('dragend', async (event) => {
   const item = event.target.closest('.task');

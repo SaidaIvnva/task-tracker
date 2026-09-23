@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Таск трекер</title>
+  <title>Календарь задач</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
-    <h1>Трекер задач</h1>
+    <h1>Календарь задач</h1>
 
     <div class="modes" role="group" aria-label="Режим просмотра">
       <button class="mode" type="button" data-mode="day">По дням</button>
@@ -116,6 +116,8 @@
     <input type="date" class="days-picker" aria-label="Перейти к дате" />
 
     <dialog class="editor" aria-label="Редактирование задачи"></dialog>
+
+    <dialog class="ask" aria-label="Подтверждение"></dialog>
   </main>
   <script src="app.js"></script>
 </body>
