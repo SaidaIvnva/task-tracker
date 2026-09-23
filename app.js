@@ -31,6 +31,8 @@ const weeksStrip = document.querySelector('.weeks-strip');
 const weeksTodayButton = document.querySelector('.weeks-today');
 const editor = document.querySelector('.editor');
 const asker = document.querySelector('.ask');
+const overdueBox = document.querySelector('.missed');
+const projectDialog = document.querySelector('.project-dialog');
 const errorBox = document.querySelector('.error');
 
 // Ключи хранилища объявлены здесь, выше первого использования:
@@ -38,6 +40,8 @@ const errorBox = document.querySelector('.error');
 // sessionStorage, а не localStorage: в новой вкладке всё начинается заново.
 const DONE_OPEN_KEY = 'tracker:doneOpen';
 const DAY_KEY = 'tracker:day';
+const DAY_SAVED_KEY = 'tracker:daySavedOn';
+const OVERDUE_KEY = 'tracker:overdueHidden';
 const PROJECT_KEY = 'tracker:project';
 const MODE_KEY = 'tracker:mode';
 const SCROLL_KEY = 'tracker:scroll';
@@ -57,6 +61,10 @@ let selectedDate = readSelectedDate();
 
 // 'day' или 'week' — тоже переживает перезагрузку вкладки
 let viewMode = readStored(MODE_KEY, 'day') === 'week' ? 'week' : 'day';
+
+// Календарный день, в который делали выбор. Нужен, чтобы поймать
+// наступление нового дня во вкладке, оставленной открытой на ночь.
+let selectionDay = todayISO();
 
 // Состояние секции «Уже сделанные» переживает перезагрузку вкладки:
 // live-reload дев-сервера перезагружает страницу после каждой записи
@@ -80,10 +88,18 @@ function saveStored(key, value) {
   }
 }
 
-// В хранилище может оказаться мусор: проверяем формат, иначе берём сегодня
+// Выбранный день восстанавливаем, только если его выбирали сегодня.
+// Иначе наутро открылся бы вчерашний день — а нужен текущий.
+// В хранилище может оказаться мусор, поэтому проверяем формат.
 function readSelectedDate() {
   const stored = readStored(DAY_KEY, '');
-  return /^\d{4}-\d{2}-\d{2}$/.test(stored) ? stored : todayISO();
+  const savedOn = readStored(DAY_SAVED_KEY, '');
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(stored) || savedOn !== todayISO()) {
+    return todayISO();
+  }
+
+  return stored;
 }
 
 let doneOpen = readStored(DONE_OPEN_KEY, 'false') === 'true';
@@ -182,6 +198,7 @@ async function addTask(text, deadline, date, projectId, repeat) {
       completed: false,
       completedDates: [],
       skipDates: [],
+      extraDates: [],
       deadline,
       date,
       projectId,
@@ -398,10 +415,63 @@ function projectName(id) {
   return findProject(id)?.name ?? null;
 }
 
-// У проектов, заведённых до появления цветов, поля нет — считаем их серыми
+// Цвет проекта — либо имя из набора, либо произвольный hex вида #rrggbb.
+// У проектов, заведённых до появления цветов, поля нет — считаем их серыми.
 function projectColor(id) {
   const color = findProject(id)?.color;
-  return PROJECT_COLORS.includes(color) ? color : 'gray';
+
+  if (PROJECT_COLORS.includes(color) || /^#[0-9a-f]{6}$/i.test(color ?? '')) {
+    return color;
+  }
+
+  return 'gray';
+}
+
+function isCustomColor(color) {
+  return /^#[0-9a-f]{6}$/i.test(color);
+}
+
+function channels(hex) {
+  return [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+}
+
+// Воспринимаемая яркость: нужна, чтобы слишком светлый или слишком тёмный
+// выбранный цвет не оказался нечитаемым на одной из тем
+function lightness(hex) {
+  const [r, g, b] = channels(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+function mixWith(hex, target, amount) {
+  const mixed = channels(hex).map((value) => Math.round(value + (target - value) * amount));
+  return `rgb(${mixed.join(', ')})`;
+}
+
+// Одно значение обслуживает обе темы, поэтому загоняем яркость в середину
+function readableInk(hex) {
+  const value = lightness(hex);
+
+  if (value > 0.68) {
+    return mixWith(hex, 0, 0.45);
+  }
+
+  if (value < 0.28) {
+    return mixWith(hex, 255, 0.4);
+  }
+
+  return hex;
+}
+
+// Набор задаёт цвета через data-color, произвольный — через инлайновые переменные
+function applyProjectColor(element, color) {
+  if (!isCustomColor(color)) {
+    element.dataset.color = color;
+    return;
+  }
+
+  const [r, g, b] = channels(color);
+  element.style.setProperty('--tag-ink', readableInk(color));
+  element.style.setProperty('--tag-bg', `rgb(${r} ${g} ${b} / 18%)`);
 }
 
 function titleForDate(iso) {
@@ -424,7 +494,11 @@ function titleForDate(iso) {
 
 function selectDate(iso) {
   selectedDate = iso;
+  selectionDay = todayISO();
+
   saveStored(DAY_KEY, iso);
+  saveStored(DAY_SAVED_KEY, selectionDay);
+
   plannedInput.value = iso;
   renderDays();
   render();
@@ -852,6 +926,12 @@ function repeatsOn(task, iso) {
     return false;
   }
 
+  // Дни, добавленные вручную из уведомления о несделанном.
+  // Проверяем до начала правила: добавить можно и раньше старта.
+  if ((task.extraDates ?? []).includes(iso)) {
+    return true;
+  }
+
   const start = plannedDate(task);
 
   // Строки ISO сравниваются лексикографически, это и есть сравнение дат
@@ -977,7 +1057,7 @@ function createProjectElement(id, name, removable) {
   if (removable) {
     const dot = document.createElement('span');
     dot.className = 'project-color';
-    dot.dataset.color = projectColor(id);
+    applyProjectColor(dot, projectColor(id));
     button.append(dot);
   }
 
@@ -1066,6 +1146,166 @@ function renderProjectOptions() {
   // В форме создания подставляем открытый проект — так чаще всего и нужно
   const preset = selectedProject === ALL_PROJECTS ? '' : selectedProject;
   fillProjectOptions(projectSelect, projectSelect.value || preset);
+}
+
+/* Несделанное за прошлые дни */
+
+// Последний пропущенный день повторяющейся задачи за неделю назад.
+// Неделя — чтобы поймать пропуск, даже если приложение не открывали пару дней,
+// и при этом не тянуть всю историю правила.
+function lastMissedRepeat(task) {
+  const today = todayISO();
+
+  for (let back = 1; back <= 7; back += 1) {
+    const iso = shiftISO(today, -back);
+
+    if (repeatsOn(task, iso) && !isCompletedOn(task, iso)) {
+      return iso;
+    }
+  }
+
+  return null;
+}
+
+// Строки уведомления. moveable говорит, можно ли добавить задачу в сегодня:
+// повторяющуюся, которая и так сегодня есть, добавлять некуда.
+function overdueEntries() {
+  const today = todayISO();
+
+  const entries = tasks.flatMap((task) => {
+    if (!matchesProject(task)) {
+      return [];
+    }
+
+    if (task.repeat) {
+      const missed = lastMissedRepeat(task);
+      return missed === null ? [] : [{ task, date: missed, moveable: !repeatsOn(task, today) }];
+    }
+
+    if (task.completed || plannedDate(task) >= today) {
+      return [];
+    }
+
+    return [{ task, date: plannedDate(task), moveable: true }];
+  });
+
+  return entries.sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+// Разовая задача переезжает датой, повторяющаяся получает
+// дополнительный день, чтобы правило осталось нетронутым
+async function moveToToday(ids) {
+  const today = todayISO();
+  let order = tasks.reduce((max, task) => Math.max(max, task.order ?? 0), 0);
+
+  await Promise.all(ids.map((id) => {
+    const task = tasks.find((item) => String(item.id) === id);
+
+    if (!task) {
+      return null;
+    }
+
+    order += 1;
+
+    const fields = task.repeat
+      ? { extraDates: [...(task.extraDates ?? []), today] }
+      : { date: today, order };
+
+    return request(`${API_URL}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+  }));
+
+  await loadTasks();
+}
+
+function renderOverdue() {
+  const today = todayISO();
+
+  // Уведомление про сегодня показываем там, где сегодня видно
+  const relevant = viewMode === 'week'
+    ? weekDays(selectedDate).includes(today)
+    : selectedDate === today;
+
+  const items = overdueEntries();
+
+  if (!relevant || items.length === 0 || readStored(OVERDUE_KEY, '') === today) {
+    overdueBox.hidden = true;
+    overdueBox.replaceChildren();
+    return;
+  }
+
+  const title = document.createElement('p');
+  title.className = 'missed-title';
+  title.textContent = `Не сделано за прошлые дни: ${items.length} ${pluralTasks(items.length)}`;
+
+  const list = document.createElement('ul');
+  list.className = 'missed-list';
+
+  list.append(...items.map(({ task, date, moveable }) => {
+    const item = document.createElement('li');
+
+    // Метка дедлайна такая же, как в списке задач
+    const dot = document.createElement('span');
+    dot.className = 'deadline-dot';
+
+    if (task.deadline) {
+      const status = deadlineStatus(task.deadline);
+      dot.classList.add(status.name);
+      dot.dataset.hint = `${status.title} · ${formatDeadline(task.deadline)}`;
+    }
+
+    const name = document.createElement('span');
+    name.className = 'missed-name';
+    name.textContent = task.text;
+
+    const when = document.createElement('span');
+    when.className = 'missed-when';
+    when.textContent = parseDate(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
+    item.append(dot, name, when);
+
+    if (moveable) {
+      const move = document.createElement('button');
+      move.type = 'button';
+      move.className = 'missed-move';
+      move.dataset.id = String(task.id);
+      move.textContent = 'В сегодня';
+      item.append(move);
+    } else {
+      // Повторяющаяся задача уже стоит на сегодня — добавлять нечего
+      const note = document.createElement('span');
+      note.className = 'missed-note';
+      note.textContent = 'уже в сегодня';
+      item.append(note);
+    }
+
+    return item;
+  }));
+
+  const moveable = items.filter((entry) => entry.moveable);
+
+  const moveAll = document.createElement('button');
+  moveAll.type = 'button';
+  moveAll.className = 'missed-all';
+  moveAll.hidden = moveable.length === 0;
+  moveAll.textContent = moveable.length === items.length
+    ? 'Перенести всё в сегодня'
+    : `Добавить в сегодня: ${moveable.length}`;
+
+  const hide = document.createElement('button');
+  hide.type = 'button';
+  hide.className = 'missed-hide';
+  hide.textContent = 'Скрыть';
+
+  const actions = document.createElement('div');
+  actions.className = 'missed-actions';
+  actions.append(moveAll, hide);
+
+  overdueBox.replaceChildren(title, list, actions);
+  overdueBox.hidden = false;
 }
 
 /* Дедлайны */
@@ -1212,7 +1452,7 @@ function createTaskElement(task, iso = selectedDate) {
   if (badge !== null) {
     const tag = document.createElement('span');
     tag.className = 'project-tag';
-    tag.dataset.color = projectColor(task.projectId);
+    applyProjectColor(tag, projectColor(task.projectId));
     tag.textContent = badge;
     extras.push(tag);
   }
@@ -1222,6 +1462,8 @@ function createTaskElement(task, iso = selectedDate) {
 }
 
 function render() {
+  renderOverdue();
+
   if (viewMode === 'week') {
     renderWeek();
     return;
@@ -1518,22 +1760,21 @@ main.addEventListener('click', async (event) => {
   }
 
   if (event.target.closest('.project-add')) {
-    openProjectInput();
+    openProjectDialog();
   }
 });
 
-// Поле для имени нового проекта появляется прямо в списке, вместе с палитрой
-function openProjectInput() {
-  if (projectsList.querySelector('.project-new')) {
-    projectsList.querySelector('.project-new').focus();
-    return;
-  }
-
-  // Цвет по умолчанию берём по счётчику, чтобы новые проекты не совпадали
+// Создание проекта — в отдельном окне: в узкой колонке поле со списком
+// цветов зажимается, особенно когда проектов много
+function openProjectDialog() {
   let chosen = PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
 
-  const item = document.createElement('li');
-  item.className = 'project project-draft';
+  const form = document.createElement('form');
+  form.className = 'project-form';
+
+  const title = document.createElement('h2');
+  title.className = 'editor-title';
+  title.textContent = 'Новый проект';
 
   const field = document.createElement('input');
   field.type = 'text';
@@ -1544,56 +1785,103 @@ function openProjectInput() {
   const palette = document.createElement('div');
   palette.className = 'palette';
 
+  // Отдельный образец под выбранный произвольный цвет
+  const custom = document.createElement('button');
+  custom.type = 'button';
+  custom.className = 'swatch swatch-custom';
+  custom.hidden = true;
+  custom.setAttribute('aria-label', 'Выбранный произвольный цвет');
+
+  const picker = document.createElement('input');
+  picker.type = 'color';
+  picker.className = 'palette-picker';
+  picker.setAttribute('aria-label', 'Выбрать произвольный цвет');
+
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'palette-more';
+  more.textContent = 'Другой цвет';
+
   const swatches = PROJECT_COLORS.map((color) => {
     const swatch = document.createElement('button');
     swatch.type = 'button';
     swatch.className = 'swatch';
     swatch.dataset.color = color;
     swatch.setAttribute('aria-label', `Цвет: ${color}`);
-    swatch.setAttribute('aria-pressed', String(color === chosen));
-    swatch.classList.toggle('swatch-chosen', color === chosen);
-
-    // Не даём полю потерять фокус: иначе строка закроется по focusout
-    swatch.addEventListener('mousedown', (event) => event.preventDefault());
-
-    swatch.addEventListener('click', () => {
-      chosen = color;
-
-      for (const other of swatches) {
-        const active = other.dataset.color === chosen;
-        other.classList.toggle('swatch-chosen', active);
-        other.setAttribute('aria-pressed', String(active));
-      }
-    });
-
     return swatch;
   });
 
-  palette.append(...swatches);
-  item.append(field, palette);
-  projectsList.append(item);
-  updateProjectsScroll();
+  function highlight() {
+    for (const swatch of swatches) {
+      const active = swatch.dataset.color === chosen;
+      swatch.classList.toggle('swatch-chosen', active);
+      swatch.setAttribute('aria-pressed', String(active));
+    }
+
+    const own = isCustomColor(chosen);
+    custom.hidden = !own;
+    custom.classList.toggle('swatch-chosen', own);
+
+    if (own) {
+      custom.style.setProperty('--tag-ink', chosen);
+    }
+  }
+
+  for (const swatch of swatches) {
+    swatch.addEventListener('click', () => {
+      chosen = swatch.dataset.color;
+      highlight();
+    });
+  }
+
+  custom.addEventListener('click', () => picker.click());
+
+  more.addEventListener('click', () => {
+    try {
+      picker.showPicker();
+    } catch {
+      picker.click();
+    }
+  });
+
+  picker.addEventListener('input', () => {
+    chosen = picker.value;
+    highlight();
+  });
+
+  palette.append(...swatches, custom);
+
+  const create = document.createElement('button');
+  create.type = 'submit';
+  create.textContent = 'Создать';
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'project-cancel';
+  cancel.textContent = 'Отмена';
+
+  const actions = document.createElement('div');
+  actions.className = 'project-actions';
+  actions.append(more, create, cancel);
+
+  form.append(title, field, palette, picker, actions);
+  highlight();
+
+  projectDialog.replaceChildren(form);
+  projectDialog.showModal();
   field.focus();
 
-  const close = () => {
-    item.remove();
-    updateProjectsScroll();
-  };
-
-  field.addEventListener('keydown', async (event) => {
-    if (event.key === 'Escape') {
-      close();
-      return;
-    }
-
-    if (event.key !== 'Enter') {
-      return;
-    }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
 
     const name = field.value.trim();
+
     if (name === '') {
+      field.focus();
       return;
     }
+
+    projectDialog.close();
 
     try {
       hideError();
@@ -1603,13 +1891,14 @@ function openProjectInput() {
     }
   });
 
-  // focusout вместо blur: уход фокуса внутрь строки закрывать её не должен
-  item.addEventListener('focusout', (event) => {
-    if (!item.contains(event.relatedTarget)) {
-      close();
-    }
-  });
+  cancel.addEventListener('click', () => projectDialog.close());
 }
+
+projectDialog.addEventListener('click', (event) => {
+  if (event.target === projectDialog) {
+    projectDialog.close();
+  }
+});
 
 /* Перетаскивание задач внутри дня */
 
@@ -1748,6 +2037,64 @@ main.addEventListener('click', (event) => {
 
 // Колёсико над неделей намеренно не перехватываем: вертикальный жест
 // должен листать страницу, а колонки двигаются горизонтальным жестом.
+
+/* Несделанное за прошлые дни: кнопки уведомления */
+
+overdueBox.addEventListener('click', async (event) => {
+  const one = event.target.closest('.missed-move');
+  const all = event.target.closest('.missed-all');
+
+  if (event.target.closest('.missed-hide')) {
+    saveStored(OVERDUE_KEY, todayISO());
+    renderOverdue();
+    return;
+  }
+
+  if (one === null && all === null) {
+    return;
+  }
+
+  const ids = one === null
+    ? overdueEntries().filter((entry) => entry.moveable).map((entry) => String(entry.task.id))
+    : [one.dataset.id];
+
+  try {
+    hideError();
+    await moveToToday(ids);
+  } catch (error) {
+    showError(error);
+  }
+});
+
+/* Наступление нового дня */
+
+// Вкладку могли оставить открытой на ночь. Когда к ней возвращаются,
+// показываем текущий день — в недельном режиме это автоматически даёт
+// текущую неделю, потому что она считается от выбранного дня.
+function catchUpToToday() {
+  const today = todayISO();
+
+  if (selectionDay === today) {
+    return;
+  }
+
+  selectDate(today);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    catchUpToToday();
+  }
+});
+
+window.addEventListener('focus', catchUpToToday);
+
+// На случай, если вкладка так и осталась открытой и в фокусе
+setInterval(() => {
+  if (document.visibilityState === 'visible') {
+    catchUpToToday();
+  }
+}, 60000);
 
 /* Переключение дней */
 

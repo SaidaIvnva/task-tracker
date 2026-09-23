@@ -740,6 +740,92 @@ h1 {
   outline-offset: 2px;
 }
 
+/* Уведомление о несделанном за прошлые дни */
+
+.missed {
+  margin: 0 0 1.25rem;
+  padding: 12px 14px;
+  background: var(--page-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+}
+
+.missed-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.missed-list {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.missed-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.missed-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--danger);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missed-note {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Скрытая кнопка «перенести всё» не должна занимать место во флексе */
+.missed-all[hidden] {
+  display: none;
+}
+
+.missed-when {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.missed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.missed button {
+  flex: none;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.missed button:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.missed-all {
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
 /* Сообщение об ошибке */
 
 .error {
@@ -1098,8 +1184,97 @@ h1 {
 }
 
 .editor::backdrop,
-.ask::backdrop {
+.ask::backdrop,
+.project-dialog::backdrop {
   background: rgb(0 0 0 / 35%);
+}
+
+/* Окно создания проекта */
+
+.project-dialog {
+  width: min(340px, calc(100vw - 32px));
+  padding: 1.25rem;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-dialog .project-new {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.project-dialog .project-new:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(55, 138, 221, 0.2);
+}
+
+.project-dialog .palette {
+  margin: 0;
+}
+
+.project-dialog .swatch {
+  width: 22px;
+  height: 22px;
+}
+
+/* Поле выбора цвета не показываем: его открывает кнопка «Другой цвет» */
+.palette-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch-custom[hidden] {
+  display: none;
+}
+
+.project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-actions button {
+  height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.project-actions button:hover {
+  background: var(--page-bg);
+}
+
+.palette-more {
+  margin-right: auto;
+  color: var(--text-secondary) !important;
+}
+
+.project-cancel {
+  color: var(--text-secondary) !important;
 }
 
 /* Окно с вопросом «к одному дню или ко всем» */
