@@ -300,14 +300,13 @@ h1 {
   display: none;
 }
 
-[data-mode="week"] .side {
-  flex-direction: row;
-  gap: 12px;
-  align-items: center;
+[data-mode="week"] .layout {
+  grid-template-areas:
+    "projects"
+    "content";
 }
 
 [data-mode="week"] .projects {
-  flex: 1;
   min-width: 0;
 }
 
@@ -352,14 +351,34 @@ h1 {
 .layout {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-areas:
+    "days content"
+    "projects content";
   gap: 20px;
   align-items: start;
 }
 
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.days {
+  grid-area: days;
+}
+
+.projects {
+  grid-area: projects;
+}
+
+.content {
+  grid-area: content;
+}
+
+/* Кнопка сворачивания проектов: на широком экране не нужна */
+.projects-toggle {
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: default;
+  background: transparent;
+  border: none;
 }
 
 /* Проекты */
@@ -1185,8 +1204,60 @@ h1 {
 
 .editor::backdrop,
 .ask::backdrop,
-.project-dialog::backdrop {
+.project-dialog::backdrop,
+.task-dialog::backdrop {
   background: rgb(0 0 0 / 35%);
+}
+
+/* Кнопка и окно новой задачи (узкий экран) */
+
+.add-task {
+  display: none;
+  width: 100%;
+  height: 40px;
+  margin: 0 0 1.25rem;
+  font: inherit;
+  font-size: 15px;
+  color: var(--accent);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.add-task:active {
+  transform: scale(0.99);
+}
+
+.task-dialog {
+  width: min(400px, calc(100vw - 32px));
+  padding: 1.25rem;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* Внутри окна форме уже не нужен нижний отступ */
+.task-dialog .form {
+  margin-bottom: 1rem;
+}
+
+.task-dialog-close {
+  height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.task-dialog-close:hover {
+  color: var(--text);
+  background: var(--page-bg);
 }
 
 /* Окно создания проекта */
@@ -1472,21 +1543,187 @@ h1 {
     gap: 16px;
   }
 
-  /* Дни и проекты встают в одну строку над списком задач */
-  .side {
-    flex-direction: row;
-    gap: 16px;
-    align-items: flex-start;
+  /* Форма прячется только пока лежит в странице; в окне она видна */
+  .content > .form {
+    display: none;
   }
 
-  .days {
-    flex: none;
-    width: 62px;
+  .add-task {
+    display: block;
+  }
+
+  /* Порядок сверху вниз: проекты, кнопка, полоса дней, список задач */
+  .layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    /* С десктопа тут остаётся start, и в колоночном флексе блоки
+       растягиваются по содержимому вместо ширины экрана */
+    align-items: stretch;
+  }
+
+  /* Иначе блок раздувается под ширину горизонтальных списков внутри */
+  .content,
+  .projects {
+    min-width: 0;
   }
 
   .projects {
+    order: 1;
+  }
+
+  .add-task {
+    order: 2;
+    margin: 0;
+  }
+
+  .days {
+    order: 3;
+  }
+
+  .content {
+    order: 4;
+  }
+
+  /* Полоса дней разворачивается в строку: вертикальная заняла бы пол-экрана */
+  .days {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .days-strip {
+    flex-direction: row;
+    width: auto;
+    gap: 6px;
+  }
+
+  /* Стрелки те же самые, просто смотрят вбок */
+  .days-step {
+    width: auto;
+    padding: 6px 4px;
+    transform: rotate(-90deg);
+  }
+
+  .day {
+    width: auto;
+    min-width: 54px;
+    padding: 6px 8px;
+  }
+
+  .days-today {
+    width: auto;
+    margin-top: 0;
+    align-self: center;
+  }
+
+  /* Полоса недель целиком не влезает, поэтому соседние недели
+     обрезаются по краям и затухают — как будто уходят в крутилку */
+  .week-nav {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .weeks-strip {
     flex: 1;
     min-width: 0;
+    justify-content: center;
+    overflow: hidden;
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 26px,
+      #000 calc(100% - 26px),
+      transparent 100%
+    );
+  }
+
+  /* Не сжимаем подписи: пусть лучше обрежутся краем полосы */
+  .week-item {
+    flex: 0 0 auto;
+  }
+
+  /* Недельный вид: дни становятся строками, задачи внутри дня —
+     горизонтальным рядом. Колонками они тянулись по самой высокой
+     и вылезали за карточку. */
+  .week {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .week-day {
+    padding: 8px 0;
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+  }
+
+  .week-day:last-child {
+    border-bottom: none;
+  }
+
+  .week-day-today {
+    outline: none;
+  }
+
+  .week-day-today .week-day-number {
+    color: var(--accent);
+  }
+
+  .week-day-head {
+    margin-bottom: 4px;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .week-tasks {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .week-tasks::-webkit-scrollbar {
+    display: none;
+  }
+
+  .week-tasks .task {
+    flex: 0 0 150px;
+    padding: 8px;
+    background: var(--page-bg);
+    border-bottom: none;
+    border-radius: var(--radius);
+  }
+
+  .week-tasks .tasks-empty {
+    padding: 0;
+  }
+
+  /* Сворачивание проектов */
+  .projects-toggle {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .projects-toggle::before {
+    font-size: 9px;
+    color: var(--text-muted);
+    content: '\25bc';
+  }
+
+  .projects-collapsed .projects-toggle::before {
+    content: '\25b6';
+  }
+
+  .projects-collapsed .projects-scroll {
+    display: none;
   }
 }
 
