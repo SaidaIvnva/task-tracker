@@ -19,6 +19,8 @@ const tasksTitle = document.querySelector('.tasks-title');
 const deadlineInput = document.querySelector('#deadline');
 const plannedInput = document.querySelector('#planned');
 const projectsList = document.querySelector('.projects-list');
+const projectsBox = document.querySelector('.projects');
+const projectsToggle = document.querySelector('.projects-toggle');
 const projectsArrowStart = document.querySelector('.projects-arrow-start');
 const projectsArrowEnd = document.querySelector('.projects-arrow-end');
 const projectSelect = document.querySelector('#project');
@@ -33,6 +35,9 @@ const editor = document.querySelector('.editor');
 const asker = document.querySelector('.ask');
 const overdueBox = document.querySelector('.missed');
 const projectDialog = document.querySelector('.project-dialog');
+const taskDialog = document.querySelector('.task-dialog');
+const addTaskButton = document.querySelector('.add-task');
+const content = document.querySelector('.content');
 const errorBox = document.querySelector('.error');
 
 // Ключи хранилища объявлены здесь, выше первого использования:
@@ -42,6 +47,7 @@ const DONE_OPEN_KEY = 'tracker:doneOpen';
 const DAY_KEY = 'tracker:day';
 const DAY_SAVED_KEY = 'tracker:daySavedOn';
 const OVERDUE_KEY = 'tracker:overdueHidden';
+const PROJECTS_OPEN_KEY = 'tracker:projectsOpen';
 const PROJECT_KEY = 'tracker:project';
 const MODE_KEY = 'tracker:mode';
 const SCROLL_KEY = 'tracker:scroll';
@@ -1582,7 +1588,11 @@ form.addEventListener('submit', async (event) => {
     showError(error);
   }
 
-  input.focus();
+  if (taskDialog.open) {
+    closeTaskDialog();
+  } else {
+    input.focus();
+  }
 });
 
 main.addEventListener('change', async (event) => {
@@ -2063,6 +2073,85 @@ overdueBox.addEventListener('click', async (event) => {
     await moveToToday(ids);
   } catch (error) {
     showError(error);
+  }
+});
+
+/* Сворачивание раздела проектов на узком экране */
+
+function applyProjectsOpen(open) {
+  projectsBox.classList.toggle('projects-collapsed', !open);
+  projectsToggle.setAttribute('aria-expanded', String(open));
+  saveStored(PROJECTS_OPEN_KEY, String(open));
+
+  // Стрелки и затухание считаются по видимой высоте списка
+  updateProjectsScroll();
+}
+
+projectsToggle.addEventListener('click', () => {
+  applyProjectsOpen(projectsBox.classList.contains('projects-collapsed'));
+});
+
+applyProjectsOpen(readStored(PROJECTS_OPEN_KEY, 'true') !== 'false');
+
+/* Новая задача на узком экране */
+
+// Форму не дублируем, а переносим тот же элемент в окно и обратно:
+// иначе пришлось бы держать два набора полей и два обработчика отправки
+const narrow = matchMedia('(max-width: 560px)');
+
+function openTaskDialog() {
+  // Повторный showModal() на открытом окне бросает исключение,
+  // и форма осталась бы запертой внутри
+  if (taskDialog.open) {
+    input.focus();
+    return;
+  }
+
+  const title = document.createElement('h2');
+  title.className = 'editor-title';
+  title.textContent = 'Новая задача';
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'task-dialog-close';
+  close.textContent = 'Отмена';
+
+  taskDialog.replaceChildren(title, form, close);
+  taskDialog.showModal();
+  input.focus();
+
+  close.addEventListener('click', closeTaskDialog);
+}
+
+// Возврат формы на её место в странице — перед блоком ошибки
+function restoreForm() {
+  if (form.parentElement !== content) {
+    content.insertBefore(form, errorBox);
+  }
+}
+
+function closeTaskDialog() {
+  taskDialog.close();
+  restoreForm();
+}
+
+addTaskButton.addEventListener('click', openTaskDialog);
+
+taskDialog.addEventListener('click', (event) => {
+  if (event.target === taskDialog) {
+    closeTaskDialog();
+  }
+});
+
+// Escape закрывает окно сам — форму возвращаем по событию
+taskDialog.addEventListener('close', restoreForm);
+
+// Страховка на случай, если событие close не дойдёт: на широком экране
+// форма обязана быть в странице, иначе её негде показать
+narrow.addEventListener('change', (event) => {
+  if (!event.matches) {
+    taskDialog.close();
+    restoreForm();
   }
 });
 

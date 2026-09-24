@@ -16,7 +16,6 @@
     </div>
 
     <div class="layout">
-      <aside class="side">
       <div class="days">
         <button class="days-step" type="button" data-step="-1" aria-label="Предыдущий день">&#9650;</button>
 
@@ -29,7 +28,7 @@
 
       <div class="projects">
         <div class="projects-header">
-          <span>Проекты</span>
+          <button class="projects-toggle" type="button" aria-expanded="true">Проекты</button>
           <button class="project-add" type="button" aria-label="Создать проект" title="Создать проект">+</button>
         </div>
         <div class="projects-scroll">
@@ -38,7 +37,8 @@
           <button class="projects-arrow projects-arrow-end" type="button" hidden aria-label="Прокрутить вперёд"></button>
         </div>
       </div>
-      </aside>
+
+      <button class="add-task" type="button">+ Новая задача</button>
 
       <div class="content">
         <form class="form">
@@ -122,6 +122,8 @@
     <dialog class="ask" aria-label="Подтверждение"></dialog>
 
     <dialog class="project-dialog" aria-label="Новый проект"></dialog>
+
+    <dialog class="task-dialog" aria-label="Новая задача"></dialog>
   </main>
   <script src="app.js"></script>
 </body>
